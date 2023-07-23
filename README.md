@@ -162,7 +162,6 @@ All parameters are optional as they have default values (including default iDRAC
 - `CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION` parameter is only necessary if you're using line interpolation. Must be lower than **CPU_TEMPERATURE_THRESHOLD**. **Default** value is 40(°C).
 - `HIGH_FAN_SPEED` parameter is only necessary if you're using line interpolation. It defines maximum fan speed before swiching to dell temperature control. **Default** value is 45(%).
 
-
 Example of how interpolation work:
 - `FAN_SPEED` = 10
 - `HIGH_FAN_SPEED` = 50
@@ -177,6 +176,8 @@ Example of how interpolation work:
 | 50 °C  | 30 %  |
 | 69 °C  | 49 %  |
 | 70 °C  | Dell fan control  |
+
+When using line interpolation it's recommended to lower **CHECK_INTERVAL** to value such as 3 seconds).
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
