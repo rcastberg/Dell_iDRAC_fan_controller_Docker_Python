@@ -263,7 +263,7 @@ while true; do
         # Temperature above lower value
         TEMPERATURE_ABOVE_LOWER_THRESHOLD="$((CPU_HIGHER_TEMP - CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION))"
         # Difference between higher and lower fan speed
-        FAN_WINDOW="$((HIGH_FAN_SPEED - FAN_SPEED))"
+        FAN_WINDOW="$((DECIMAL_HIGH_FAN_SPEED - FAN_SPEED))"
         FAN_VALUE_TO_ADD=0
         # Check if TEMP_WINDOW is grater than 0
         if [ $TEMP_WINDOW -gt $FAN_VALUE_TO_ADD ];
