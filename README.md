@@ -177,7 +177,7 @@ Example of how interpolation work:
 | 69 °C  | 49 %  |
 | 70 °C  | Dell fan control  |
 
-When using line interpolation it's recommended to lower **CHECK_INTERVAL** to value such as 3 seconds).
+When using line interpolation it's recommended to lower **CHECK_INTERVAL** to value such as 3 seconds.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
