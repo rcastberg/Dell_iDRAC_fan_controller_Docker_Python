@@ -266,7 +266,7 @@ while true; do
       fi
       if $IS_GPU_WEB_TEMP_AVAILABLE
       then
-	  GPU_TEMP_ADJ=$(echo "($GPU_TEMP*0.80) / 1"|bc )
+	  GPU_TEMP_ADJ=$(( $GPU_TEMP*80/100 ))
 	  if [ $GPU_TEMP_ADJ -gt $CPU_HIGHER_TEMP ];
 	  then
 	      CPU_HIGHER_TEMP=$GPU_TEMP_ADJ

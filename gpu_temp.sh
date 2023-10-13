@@ -4,7 +4,7 @@ import subprocess
 import time
 import os
 
-hostName = "10.0.10.194"
+hostName = "0.0.0.0"
 serverPort = 980
 
 class MyServer(BaseHTTPRequestHandler):
