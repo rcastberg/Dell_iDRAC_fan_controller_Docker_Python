@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.authors="tigerblue77"
 
 RUN apt-get update
 
-RUN apt-get install ipmitool -y
+RUN apt-get install ipmitool wget -y
 
 ADD Dell_iDRAC_fan_controller.sh /Dell_iDRAC_fan_controller.sh
 
