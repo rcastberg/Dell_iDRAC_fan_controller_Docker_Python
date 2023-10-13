@@ -1,5 +1,11 @@
 <div id="top"></div>
 
+
+
+# WARNING
+This was implmented for personal use and not ready to be deployed, it has barely been tested and has some parameters that i find useful
+Please don't use unless you know what you are doing. There is no support etc
+
 > **Warning** If you update to the latest version, be sure to replace "CPU_TEMPERATURE_TRESHOLD" environment variable with "CPU_TEMPERATURE_T<ins>H</ins>RESHOLD" which was a typo
 
 # Dell iDRAC fan controller Docker image

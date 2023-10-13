@@ -8,6 +8,7 @@
 # This function applies Dell's default dynamic fan control profile
 function apply_Dell_fan_control_profile () {
   # Use ipmitool to send the raw command to set fan control to Dell default
+  echo DELL FAN
   ipmitool -I $IDRAC_LOGIN_STRING raw 0x30 0x30 0x01 0x01 > /dev/null
   CURRENT_FAN_CONTROL_PROFILE="Dell default dynamic fan control profile"
 }
@@ -15,6 +16,7 @@ function apply_Dell_fan_control_profile () {
 # This function applies a user-specified static fan control profile
 function apply_user_fan_control_profile () {
   # Use ipmitool to send the raw command to set fan control to user-specified value
+  echo FAN at $DECIMAL_FAN_SPEED
   ipmitool -I $IDRAC_LOGIN_STRING raw 0x30 0x30 0x01 0x00 > /dev/null
   ipmitool -I $IDRAC_LOGIN_STRING raw 0x30 0x30 0x02 0xff $HEXADECIMAL_FAN_SPEED > /dev/null
   CURRENT_FAN_CONTROL_PROFILE="User static fan control profile ($DECIMAL_FAN_SPEED%)"
@@ -29,13 +31,14 @@ function apply_line_interpolation_fan_control_profile () {
 # Retrieve temperature sensors data using ipmitool
 # Usage : retrieve_temperatures $IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT $IS_CPU2_TEMPERATURE_SENSOR_PRESENT
 function retrieve_temperatures () {
-  if (( $# != 2 ))
+  if (( $# != 3 ))
   then
-    printf "Illegal number of parameters.\nUsage: retrieve_temperatures \$IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT \$IS_CPU2_TEMPERATURE_SENSOR_PRESENT" >&2
+    printf "Illegal number of parameters.\nUsage: retrieve_temperatures \$IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT \$IS_CPU2_TEMPERATURE_SENSOR_PRESENT \$IS_GPU_WEB_TEMP_AVAILABLE" >&2
     return 1
   fi
   local IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT=$1
   local IS_CPU2_TEMPERATURE_SENSOR_PRESENT=$2
+  local IS_GPU_WEB_TEMP_AVAILABLE=$3
 
   local DATA=$(ipmitool -I $IDRAC_LOGIN_STRING sdr type temperature | grep degrees)
 
@@ -58,6 +61,15 @@ function retrieve_temperatures () {
     EXHAUST_TEMPERATURE=$(echo "$DATA" | grep Exhaust | grep -Po '\d{2}' | tail -1)
   else
     EXHAUST_TEMPERATURE="-"
+  fi
+
+  #Get GPU temp 
+  if $IS_GPU_WEB_TEMP_AVAILABLE
+  then
+      GPU_TEMP=$(wget $GPU_HOST:980 -O - -q)
+  else
+      #Set too hot temp for GPU if we can't get hold of the temp
+      GPU_TEMP=80
   fi
 }
 
@@ -148,6 +160,7 @@ else
   IDRAC_LOGIN_STRING="lanplus -H $IDRAC_HOST -U $IDRAC_USERNAME -P $IDRAC_PASSWORD"
 fi
 
+echo "GPU Host: $GPU_HOST"
 # Log the fan speed objective, CPU temperature threshold and check interval
 echo "Line interpolation enable: $ENABLE_LINE_INTERPOLATION"
 if $ENABLE_LINE_INTERPOLATION
@@ -172,9 +185,10 @@ i=$TABLE_HEADER_PRINT_INTERVAL
 IS_DELL_FAN_CONTROL_PROFILE_APPLIED=true
 
 # Check present sensors
+IS_GPU_WEB_TEMP_AVAILABLE=true
 IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT=true
 IS_CPU2_TEMPERATURE_SENSOR_PRESENT=true
-retrieve_temperatures $IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT $IS_CPU2_TEMPERATURE_SENSOR_PRESENT
+retrieve_temperatures $IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT $IS_CPU2_TEMPERATURE_SENSOR_PRESENT $IS_GPU_WEB_TEMP_AVAILABLE
 if [ -z "$EXHAUST_TEMPERATURE" ]
 then
   echo "No exhaust temperature sensor detected."
@@ -197,7 +211,7 @@ while true; do
   sleep $CHECK_INTERVAL &
   SLEEP_PROCESS_PID=$!
 
-  retrieve_temperatures $IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT $IS_CPU2_TEMPERATURE_SENSOR_PRESENT
+  retrieve_temperatures $IS_EXHAUST_TEMPERATURE_SENSOR_PRESENT $IS_CPU2_TEMPERATURE_SENSOR_PRESENT $IS_GPU_WEB_TEMP_AVAILABLE
 
   # Define functions to check if CPU 1 and CPU 2 temperatures are above the threshold
   function CPU1_OVERHEAT () { [ $CPU1_TEMPERATURE -gt $CPU_TEMPERATURE_THRESHOLD ]; }
@@ -205,6 +219,7 @@ while true; do
   then
     function CPU2_OVERHEAT () { [ $CPU2_TEMPERATURE -gt $CPU_TEMPERATURE_THRESHOLD ]; }
   fi
+  function GPU_OVERHEAT () { [ $GPU_TEMP -gt $GPU_TEMPERATURE_THRESHOLD ]; }
 
   # Initialize a variable to store the comments displayed when the fan control profile changed
   COMMENT=" -"
@@ -238,18 +253,26 @@ while true; do
     fi
   else
     if $ENABLE_LINE_INTERPOLATION
-    then    
+    then
       CURRENT_FAN_SPEED=$DECIMAL_FAN_SPEED
-      
+
       CPU_HIGHER_TEMP=$CPU1_TEMPERATURE
       if $IS_CPU2_TEMPERATURE_SENSOR_PRESENT
       then
-        if [ $CPU2_TEMPERATURE -gt $CPU1_TEMPERATURE ]; 
+        if [ $CPU2_TEMPERATURE -gt $CPU1_TEMPERATURE ];
         then
           CPU_HIGHER_TEMP=$CPU2_TEMPERATURE
         fi
       fi
-      
+      if $IS_GPU_WEB_TEMP_AVAILABLE
+      then
+	  GPU_TEMP_ADJ=$(echo "($GPU_TEMP*0.80) / 1"|bc )
+	  if [ $GPU_TEMP_ADJ -gt $CPU_HIGHER_TEMP ];
+	  then
+	      CPU_HIGHER_TEMP=$GPU_TEMP_ADJ
+	  fi
+      fi
+
       if [ $CPU_HIGHER_TEMP -gt $CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION ]; 
       then
         #
@@ -267,7 +290,7 @@ while true; do
         # Difference between higher and lower fan speed
         FAN_WINDOW="$((DECIMAL_HIGH_FAN_SPEED - DECIMAL_FAN_SPEED))"
         FAN_VALUE_TO_ADD=0
-        # Check if TEMP_WINDOW is grater than 0
+        # Check if TEMP_WINDOW is greater than 0
         if [ $TEMP_WINDOW -gt $FAN_VALUE_TO_ADD ];
         then
           FAN_VALUE_TO_ADD="$((FAN_WINDOW * TEMPERATURE_ABOVE_LOWER_THRESHOLD / TEMP_WINDOW))"
@@ -303,11 +326,12 @@ while true; do
   # Print temperatures, active fan control profile and comment if any change happened during last time interval
   if [ $i -eq $TABLE_HEADER_PRINT_INTERVAL ]
   then
-    echo "                     ------- Temperatures -------"
-    echo "    Date & time      Inlet  CPU 1  CPU 2  Exhaust          Active fan speed profile          Third-party PCIe card Dell default cooling response  Comment"
+    echo "                     ------- Temperatures ------------"
+    echo "    Date & time      Inlet  CPU 1  CPU 2  GPU  Exhaust          Active fan speed profile          3rd PCIe card Dell default   Comment"
+    echo "                                                                                                       cooling response"
     i=0
   fi
-  printf "%19s  %3d°C  %3d°C  %3s°C  %5s°C  %40s  %51s  %s\n" "$(date +"%d-%m-%Y %T")" $INLET_TEMPERATURE $CPU1_TEMPERATURE "$CPU2_TEMPERATURE" "$EXHAUST_TEMPERATURE" "$CURRENT_FAN_CONTROL_PROFILE" "$THIRD_PARTY_PCIE_CARD_DELL_DEFAULT_COOLING_RESPONSE_STATUS" "$COMMENT"
+  printf "%19s  %3d°C  %3d°C  %3s°C %3s°C  %5s°C  %40s  %21s  %s %s (%s)\n" "$(date +"%d-%m-%Y %T")" $INLET_TEMPERATURE $CPU1_TEMPERATURE "$CPU2_TEMPERATURE" "$GPU_TEMP" "$EXHAUST_TEMPERATURE" "$CURRENT_FAN_CONTROL_PROFILE" "$THIRD_PARTY_PCIE_CARD_DELL_DEFAULT_COOLING_RESPONSE_STATUS" "$COMMENT" 
   ((i++))
   wait $SLEEP_PROCESS_PID
 done
