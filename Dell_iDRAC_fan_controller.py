@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 import requests
 import os
-from dotenv import load_dotenv
-load_dotenv()
 
 import signal
 import sys
@@ -18,20 +16,27 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
+def load_env_default(env_var, default):
+    try:
+        variable = os.environ[env_var]
+    except KeyError:
+        variable = default
+        print(f"Environment variable {env_var} not set, using default value: {default}")
+    return variable
 
-hostname=os.getenv('IDRAC_HOST', 'localhost')
-port=os.getenv('IDRAC_PORT', '8080')
-gpu_host=os.getenv('GPU_HOST', hostname)
-gpu_port=os.getenv('GPU_PORT', '980')
-check_interval=int(os.getenv('CHECK_INTERVAL', 5))
-third_party_pcie_cooling=os.getenv('THIRD_PARTY_PCIE_COOLING', 'True')
+hostname=load_env_default('IDRAC_HOST', 'localhost')
+gpu_host=load_env_default('GPU_HOST', hostname)
+gpu_port=load_env_default('GPU_PORT', '980')
+check_interval=int(load_env_default('CHECK_INTERVAL', 5))
+third_party_pcie_cooling=load_env_default('THIRD_PARTY_PCIE_COOLING', 'True')
 
 #Get parameters for CPU/TEMP Curves
 CPU_Curve=os.getenv("CPU_Curve","pow(10,((temp-10)/20))")
+print(CPU_Curve)
 GPU_Curve=os.getenv("GPU_Curve","pow(10,((temp-18)/20))")
 MIN_FAN_SPEED=int(os.getenv("MIN_FAN",10))
 DELL_Control=int(os.getenv("DELL_Control",70))
-IDRAC_LOGIN_STRING = f"lanplus -H {hostname} -U {os.getenv('IDRAC_USERNAME', 'root')} -P {os.getenv('IDRAC_PASSWORD', 'Password')}"
+IDRAC_LOGIN_STRING = f"lanplus -H {hostname} -U {load_env_default('IDRAC_USERNAME', 'root')} -P {load_env_default('IDRAC_PASSWORD', 'Password')}"
 
 
 def get_temp_gpu(hostname, port):
@@ -82,7 +87,6 @@ import subprocess
 def apply_Dell_fan_control_profile():
     # Use ipmitool to send the raw command to set fan control to Dell default
     print("Swtich to DELL fan control profile...")
-    print(['ipmitool', '-I', IDRAC_LOGIN_STRING, 'raw', '0x30', '0x30', '0x01', '0x01'])
     os.popen(' '.join(['ipmitool', '-I', IDRAC_LOGIN_STRING, 'raw', '0x30', '0x30', '0x01', '0x01']))
 
 
@@ -115,6 +119,7 @@ i=-1
 cur_time = datetime.now()
 # Set third party PCIe card cooling to user choice
 third_party_PCIe_card_Dell_default_cooling_response(third_party_pcie_cooling == 'True')
+print('Initialized, press Ctrl+C to exit')
 while True:
     i+=1
     temp_dict = get_temp_idrac()

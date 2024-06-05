@@ -111,6 +111,11 @@ All parameters are optional as they have default values (including default iDRAC
 Will add later if nessacary
 <p align="right">(<a href="#top">back to top</a>)</p>
 
+<!-- TODO -->
+## ToDo:
+1. Add support for MultiGPU
+2. Clean up code
+
 <!-- CONTRIBUTING -->
 ## Contributing
 
