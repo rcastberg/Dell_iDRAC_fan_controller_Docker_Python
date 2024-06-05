@@ -57,9 +57,8 @@ docker run -d \
   -e MIN_FAN=15 \
   -e CPU_CURVE="pow(10,((temp-10)/20))" \
   -e GPU_CURVE="pow(10,((temp-18)/20))" \
-  tigerblue77/dell_idrac_fan_controller:latest
+  ghcr.io/rcastberg/dell_idrac_fan_controller_docker_python:latest
 ```
-`docker-compose.yml` examples:
 
 1. to use with LAN iDRAC:
 
@@ -68,7 +67,7 @@ version: '3'
 
 services:
   Dell_iDRAC_fan_controller:
-    image: tigerblue77/dell_idrac_fan_controller:latest
+    image: ghcr.io/rcastberg/dell_idrac_fan_controller_docker_python:latest
     container_name: Dell_iDRAC_fan_controller
     restart: unless-stopped
     environment:
@@ -103,6 +102,7 @@ All parameters are optional as they have default values (including default iDRAC
 - `CPU_Curve` sting representation of curve in python, temp is replaced with sensor value, **Default** is "pow(10,((temp-10)/20))", see [Reddit article](https://www.reddit.com/r/homelab/comments/x5y63n/fan_curve_for_dell_r730r730xd/) for more information, default is quite conservative. 
 - `GPU_Curve` string representation of curve in python, temp is replace with GPU sensor value **Default** "pow(10,((temp-18)/20))", as abvove for CPU_Curve.
 - `DELL_Control` parameter with percentage to hand over control to the dell alogrithumn, **Default** 75C
+- `HYSTERISIS_LENGTH` parameter of number of loops to keep a hysteriss, so that we keep the system cool for an extended period. **Default** 20 loops
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

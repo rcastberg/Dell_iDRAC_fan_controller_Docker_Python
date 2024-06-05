@@ -6,6 +6,7 @@ import signal
 import sys
 import time
 from datetime import datetime
+from collections import deque
 
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
@@ -27,6 +28,7 @@ def load_env_default(env_var, default):
 hostname=load_env_default('IDRAC_HOST', 'localhost')
 gpu_host=load_env_default('GPU_HOST', hostname)
 gpu_port=load_env_default('GPU_PORT', '980')
+hysterisis_length=int(load_env_default('HYSTERISIS_LENGTH', '10'))
 check_interval=int(load_env_default('CHECK_INTERVAL', 5))
 third_party_pcie_cooling=load_env_default('THIRD_PARTY_PCIE_COOLING', 'True')
 
@@ -37,6 +39,7 @@ MIN_FAN_SPEED=int(os.getenv("MIN_FAN",10))
 DELL_Control=int(os.getenv("DELL_Control",70))
 IDRAC_LOGIN_STRING = f"lanplus -H {hostname} -U {load_env_default('IDRAC_USERNAME', 'root')} -P {load_env_default('IDRAC_PASSWORD', 'Password')}"
 
+fan_his = deque([10]*10, maxlen=10)
 
 def get_temp_gpu(hostname, port):
     url = f"http://{gpu_host}:{gpu_port}/"
@@ -111,8 +114,10 @@ def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp):
     FanCPU0 = int(eval(CPU_Curve.replace('temp','CPU0_temp')))
     FanCPU1 = int(eval(CPU_Curve.replace('temp','CPU1_temp')))
     FanGPU =  int(eval(GPU_Curve.replace('temp','GPU_temp')))
-    apply_user_fan_control_profile(max(FanCPU0, FanCPU1, FanGPU, MIN_FAN_SPEED))
-    return "User fan control set to {}%".format(max(FanCPU0, FanCPU1, FanGPU, MIN_FAN_SPEED)), (FanCPU0, FanCPU1, FanGPU)
+    current_fanspeed = max(FanCPU0, FanCPU1, FanGPU, MIN_FAN_SPEED)
+    fan_his.append(current_fanspeed)
+    apply_user_fan_control_profile(max(fan_his))
+    return f"User fan control set to {max(fan_his)}", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
 
 i=-1
 cur_time = datetime.now()
