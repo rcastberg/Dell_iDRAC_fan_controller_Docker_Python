@@ -29,6 +29,7 @@ third_party_pcie_cooling=os.getenv('THIRD_PARTY_PCIE_COOLING', 'True')
 #Get parameters for CPU/TEMP Curves
 CPU_Curve=os.getenv("CPU_Curve","(30,10),(60,100)")
 GPU_Curve=os.getenv("GPU_Curve","(40,30),(60,100)")
+MIN_FAN_SPEED=int(os.getenv("MIN_FAN",10))
 DELL_Control=int(os.getenv("DELL_Control",70))
 IDRAC_LOGIN_STRING = f"lanplus -H {os.environ['IDRAC_HOST']} -U {os.environ['IDRAC_USERNAME']} -P {os.environ['IDRAC_PASSWORD']}"
 
@@ -104,17 +105,11 @@ def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp):
     if CPU0_temp > DELL_Control or CPU1_temp > DELL_Control:
         apply_Dell_fan_control_profile()
         return "Dell Fan Control"
-    (x1,y1,x2,y2) = [int(v) for v in CPU_Curve.replace('(','').replace(')','').split(",")]
-    CPU_gradient = (y2 - y1) / (x2 - x1)
-    CPU_intercept = y1 - CPU_gradient * x1
-    FanCPU0 = int(CPU0_temp*CPU_gradient + CPU_intercept)
-    FanCPU1 = int(CPU1_temp*CPU_gradient + CPU_intercept)
-    (x1,y1,x2,y2) = [int(v) for v in GPU_Curve.replace('(','').replace(')','').split(",")]
-    GPU_gradient = (y2 - y1) / (x2 - x1)
-    GPU_intercept = y1 - GPU_gradient * x1
-    FanGPU = int(GPU_temp*GPU_gradient + GPU_intercept)
-    apply_user_fan_control_profile(max(FanCPU0, FanCPU1, FanGPU))
-    return "User fan control set to {}%".format(max(FanCPU0, FanCPU1, FanGPU)), (FanCPU0, FanCPU1, FanGPU)
+    FanCPU0 = int(eval(CPU_Curve.replace('temp','CPU0_temp')))
+    FanCPU1 = int(eval(CPU_Curve.replace('temp','CPU1_temp')))
+    FanGPU =  int(eval(GPU_Curve.replace('temp','GPU_temp')))
+    apply_user_fan_control_profile(max(FanCPU0, FanCPU1, FanGPU, MIN_FAN_SPEED))
+    return "User fan control set to {}%".format(max(FanCPU0, FanCPU1, FanGPU, MIN_FAN_SPEED)), (FanCPU0, FanCPU1, FanGPU)
 
 i=-1
 cur_time = datetime.now()
