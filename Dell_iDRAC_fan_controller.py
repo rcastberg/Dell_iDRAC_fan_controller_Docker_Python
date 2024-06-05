@@ -27,11 +27,11 @@ check_interval=int(os.getenv('CHECK_INTERVAL', 5))
 third_party_pcie_cooling=os.getenv('THIRD_PARTY_PCIE_COOLING', 'True')
 
 #Get parameters for CPU/TEMP Curves
-CPU_Curve=os.getenv("CPU_Curve","(30,10),(60,100)")
-GPU_Curve=os.getenv("GPU_Curve","(40,30),(60,100)")
+CPU_Curve=os.getenv("CPU_Curve","pow(10,((temp-10)/20))")
+GPU_Curve=os.getenv("GPU_Curve","pow(10,((temp-18)/20))")
 MIN_FAN_SPEED=int(os.getenv("MIN_FAN",10))
 DELL_Control=int(os.getenv("DELL_Control",70))
-IDRAC_LOGIN_STRING = f"lanplus -H {os.environ['IDRAC_HOST']} -U {os.environ['IDRAC_USERNAME']} -P {os.environ['IDRAC_PASSWORD']}"
+IDRAC_LOGIN_STRING = f"lanplus -H {hostname} -U {os.getenv('IDRAC_USERNAME', 'root')} -P {os.getenv('IDRAC_PASSWORD', 'Password')}"
 
 
 def get_temp_gpu(hostname, port):

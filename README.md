@@ -6,12 +6,11 @@
 This was implmented for personal use and not ready to be deployed, it has barely been tested and has some parameters that i find useful
 Please don't use unless you know what you are doing. There is no support etc
 
-> **Warning** If you update to the latest version, be sure to replace "CPU_TEMPERATURE_TRESHOLD" environment variable with "CPU_TEMPERATURE_T<ins>H</ins>RESHOLD" which was a typo
+This version is modified to run as a python script. There is a helper script to check the GPU temps and adjust fan speeds accordingly.
 
 # Dell iDRAC fan controller Docker image
 Download Docker image from :
-- [Docker Hub](https://hub.docker.com/r/tigerblue77/dell_idrac_fan_controller)
-- [GitHub Containers Repository](https://github.com/tigerblue77/Dell_iDRAC_fan_controller_Docker/pkgs/container/dell_idrac_fan_controller)
+- [GitHub Containers Repository](docker pull ghcr.io/rcastberg/dell_idrac_fan_controller_with_line_interpolation:latest)
 
 <!-- TABLE OF CONTENTS -->
 <details>
@@ -27,7 +26,7 @@ Download Docker image from :
 
 ## Container console log example
 
-![image](https://user-images.githubusercontent.com/37409593/216442212-d2ad7ff7-0d6f-443f-b8ac-c67b5f613b83.png)
+![image](screenshot.png)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
@@ -37,74 +36,32 @@ Download Docker image from :
 
 This Docker container only works on Dell PowerEdge servers that support IPMI commands, i.e. < iDRAC 9 firmware 3.30.30.30.
 
-### To access iDRAC over LAN (not needed in "local" mode) :
-
-1. Log into your iDRAC web console
-
-![001](https://user-images.githubusercontent.com/37409593/210168273-7d760e47-143e-4a6e-aca7-45b483024139.png)
-
-2. In the left side menu, expand "iDRAC settings", click "Network" then click "IPMI Settings" link at the top of the web page.
-
-![002](https://user-images.githubusercontent.com/37409593/210168249-994f29cc-ac9e-4667-84f7-07f6d9a87522.png)
-
-3. Check the "Enable IPMI over LAN" checkbox then click "Apply" button.
-
-![003](https://user-images.githubusercontent.com/37409593/210168248-a68982c4-9fe7-40e7-8b2c-b3f06fbfee62.png)
-
-4. Test access to IPMI over LAN running the following commands :
-```bash
-apt -y install ipmitool
-ipmitool -I lanplus \
-  -H <iDRAC IP address> \
-  -U <iDRAC username> \
-  -P <iDRAC password> \
-  sdr elist all
-```
-
-<p align="right">(<a href="#top">back to top</a>)</p>
+### To access iDRAC over LAN (not needed in "local" mode):
+ NOT implemented
 
 <!-- USAGE -->
 ## Usage
 
-1. with local iDRAC:
+1. with LAN iDRAC:
 
 ```bash
 docker run -d \
   --name Dell_iDRAC_fan_controller \
   --restart=unless-stopped \
-  -e IDRAC_HOST=local \
-  -e FAN_SPEED=<decimal or hexadecimal fan speed> \
-  -e CPU_TEMPERATURE_THRESHOLD=<decimal temperature threshold> \
-  -e CHECK_INTERVAL=<seconds between each check> \
-  -e DISABLE_THIRD_PARTY_PCIE_CARD_DELL_DEFAULT_COOLING_RESPONSE=<true or false> \
-  -e ENABLE_LINE_INTERPOLATION=<true or false> \
-  -e CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION=<decimal temperature lower threshold, olny when interpolation enabled> \
-  -e HIGH_FAN_SPEED=<decimal or hexadecimal fan speed, only when interpolation enabled> \
-  --device=/dev/ipmi0:/dev/ipmi0:rw \
-  tigerblue77/dell_idrac_fan_controller:latest
-```
-
-2. with LAN iDRAC:
-
-```bash
-docker run -d \
-  --name Dell_iDRAC_fan_controller \
-  --restart=unless-stopped \
-  -e IDRAC_HOST=<iDRAC IP address> \
-  -e IDRAC_USERNAME=<iDRAC username> \
-  -e IDRAC_PASSWORD=<iDRAC password> \
-  -e FAN_SPEED=<decimal or hexadecimal fan speed> \
-  -e CPU_TEMPERATURE_THRESHOLD=<decimal temperature threshold> \
-  -e CHECK_INTERVAL=<seconds between each check> \
-  -e DISABLE_THIRD_PARTY_PCIE_CARD_DELL_DEFAULT_COOLING_RESPONSE=<true or false> \
-  -e ENABLE_LINE_INTERPOLATION=<true or false> \
-  -e CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION=<decimal temperature lower threshold, only when interpolation enabled> \
-  -e HIGH_FAN_SPEED=<decimal or hexadecimal fan speed, only when interpolation enabled> \
+  -e CHECK_INTERVAL=5 \
+  -e IDRAC_USERNAME=root \
+  -e IDRAC_PASSWORD=Passw0rd \
+  -e IDRAC_HOST=10.0.10.13 \
+  -e GPU_HOST=10.0.0.12 \
+  -e GPU_PORT=980 \
+  -e MIN_FAN=15 \
+  -e CPU_CURVE="pow(10,((temp-10)/20))" \
+  -e GPU_CURVE="pow(10,((temp-18)/20))" \
   tigerblue77/dell_idrac_fan_controller:latest
 ```
 `docker-compose.yml` examples:
 
-1. to use with local iDRAC:
+1. to use with LAN iDRAC:
 
 ```yml
 version: '3'
@@ -115,39 +72,17 @@ services:
     container_name: Dell_iDRAC_fan_controller
     restart: unless-stopped
     environment:
-      - IDRAC_HOST=local
-      - FAN_SPEED=<decimal or hexadecimal fan speed>
-      - CPU_TEMPERATURE_THRESHOLD=<decimal temperature threshold>
-      - CHECK_INTERVAL=<seconds between each check>
-      - DISABLE_THIRD_PARTY_PCIE_CARD_DELL_DEFAULT_COOLING_RESPONSE=<true or false>
-      - ENABLE_LINE_INTERPOLATION=<true or false>
-      - CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION=<decimal temperature lower threshold, only when interpolation enabled>
-      - HIGH_FAN_SPEED=<decimal or hexadecimal fan speed when interpolation enabled>
-    devices:
-      - /dev/ipmi0:/dev/ipmi0:rw
-```
-
-2. to use with LAN iDRAC:
-
-```yml
-version: '3'
-
-services:
-  Dell_iDRAC_fan_controller:
-    image: tigerblue77/dell_idrac_fan_controller:latest
-    container_name: Dell_iDRAC_fan_controller
-    restart: unless-stopped
-    environment:
-      - IDRAC_HOST=<iDRAC IP address>
-      - IDRAC_USERNAME=<iDRAC username>
-      - IDRAC_PASSWORD=<iDRAC password>
-      - FAN_SPEED=<decimal or hexadecimal fan speed>
-      - CPU_TEMPERATURE_THRESHOLD=<decimal temperature threshold>
-      - CHECK_INTERVAL=<seconds between each check>
-      - DISABLE_THIRD_PARTY_PCIE_CARD_DELL_DEFAULT_COOLING_RESPONSE=<true or false>
-      - ENABLE_LINE_INTERPOLATION=<true or false>
-      - CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION=<decimal temperature lower threshold, only when interpolation enabled>
-      - HIGH_FAN_SPEED=<decimal or hexadecimal fan speed when interpolation enabled>
+      - GPU_HOST=10.0.10.12
+      - GPU_PORT=980
+      - IDRAC_USERNAME=root
+      - IDRAC_PASSWORD=Passw0rd
+      - IDRAC_HOST=10.0.10.13
+      - CHECK_INTERVAL=5
+      - THIRD_PARTY_PCIE_COOLING=False
+      - MIN_FAN=10
+      - CPU_Curve="pow(10,((temp-10)/20))"
+      - GPU_Curve="pow(10,((temp-18)/20))"
+      - DELL_Control=75
 ```
 
 <p align="right">(<a href="#top">back to top</a>)</p>
@@ -157,44 +92,23 @@ services:
 
 All parameters are optional as they have default values (including default iDRAC username and password).
 
-- `IDRAC_HOST` parameter can be set to "local" or to your distant iDRAC's IP address. **Default** value is "local".
+- `IDRAC_HOST` iDRAC's IP address. **Default** value is "localhost".
 - `IDRAC_USERNAME` parameter is only necessary if you're adressing a distant iDRAC. **Default** value is "root".
-- `IDRAC_PASSWORD` parameter is only necessary if you're adressing a distant iDRAC. **Default** value is "calvin".
-- `FAN_SPEED` parameter can be set as a decimal (from 0 to 100%) or hexadecimaladecimal value (from 0x00 to 0x64) you want to set the fans to. **Default** value is 5(%).
-- `CPU_TEMPERATURE_THRESHOLD` parameter is the T°junction (junction temperature) threshold beyond which the Dell fan mode defined in your BIOS will become active again (to protect the server hardware against overheat). **Default** value is 50(°C).
-- `CHECK_INTERVAL` parameter is the time (in seconds) between each temperature check and potential profile change. **Default** value is 60(s).
-- `DISABLE_THIRD_PARTY_PCIE_CARD_DELL_DEFAULT_COOLING_RESPONSE` parameter is a boolean that allows to disable third-party PCIe card Dell default cooling response. **Default** value is false.
-- `ENABLE_LINE_INTERPOLATION` parameter is a boolean that allows to enable line interpolation. If temperature value going above **CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION** they will proportionally increase fan speed to **HIGH_FAN_SPEED** when **CPU_TEMPERATURE_THRESHOLD** will reached. **Default** value is false.
-- `CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION` parameter is only necessary if you're using line interpolation. Must be lower than **CPU_TEMPERATURE_THRESHOLD**. **Default** value is 40(°C).
-- `HIGH_FAN_SPEED` parameter is only necessary if you're using line interpolation. It defines maximum fan speed before swiching to dell temperature control. **Default** value is 45(%).
-
-Example of how interpolation work:
-- `FAN_SPEED` = 10
-- `HIGH_FAN_SPEED` = 50
-- `CPU_TEMPERATURE_FOR_START_LINE_INTERPOLATION` = 30
-- `CPU_TEMPERATURE_THRESHOLD` = 70
-
-| CPU Temperature  | Fan Speed |
-| ------------- | ------------- |
-| 15 °C  | 10 %  |
-| 30 °C  | 10 %  |
-| 35 °C  | 15 %  |
-| 50 °C  | 30 %  |
-| 69 °C  | 49 %  |
-| 70 °C  | Dell fan control  |
-
-When using line interpolation it's recommended to lower **CHECK_INTERVAL** to value such as 3 seconds.
+- `IDRAC_PASSWORD` parameter is only necessary if you're adressing a distant iDRAC. **Default** value is "password".
+- `GPU_HOST` parameter specifiying the default GPU host, **Default** value is the same as IDRAC_HOST
+- `GPU_PORT` parameter specifying the dfeualt GPU port **Default** value is 980
+- `CHECK_INTERVAL` parameter specifying the default check interval **Default** value is 5s, i am unable to get much lower than this.
+- `THIRD_PARTY_PCIE_COOLING` parameter is a boolean that allows to disable third-party PCIe card Dell default cooling response. Default value is false.
+- `MIN_FAN`paraneter specifying the minimum fan speed, **Default** is 10%
+- `CPU_Curve` sting representation of curve in python, temp is replaced with sensor value, **Default** is "pow(10,((temp-10)/20))", see [Reddit article](https://www.reddit.com/r/homelab/comments/x5y63n/fan_curve_for_dell_r730r730xd/) for more information, default is quite conservative. 
+- `GPU_Curve` string representation of curve in python, temp is replace with GPU sensor value **Default** "pow(10,((temp-18)/20))", as abvove for CPU_Curve.
+- `DELL_Control` parameter with percentage to hand over control to the dell alogrithumn, **Default** 75C
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- TROUBLESHOOTING -->
 ## Troubleshooting
-
-If your server frequently switches back to the default Dell fan mode:
-1. Check `Tcase` (case temperature) of your CPU on Intel Ark website and then set `CPU_TEMPERATURE_THRESHOLD` to a slightly lower value. Example with my CPUs ([Intel Xeon E5-2630L v2](https://www.intel.com/content/www/us/en/products/sku/75791/intel-xeon-processor-e52630l-v2-15m-cache-2-40-ghz/specifications.html)) : Tcase = 63°C, I set `CPU_TEMPERATURE_THRESHOLD` to 60(°C).
-2. If it's already good, adapt your `FAN_SPEED` value to increase the airflow and thus further decrease the temperature of your CPU(s) or enable and experiment with line interpolation
-3. If neither increasing the fan speed nor increasing the threshold solves your problem, then it may be time to replace your thermal paste
-
+Will add later if nessacary
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 <!-- CONTRIBUTING -->
