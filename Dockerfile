@@ -8,4 +8,4 @@ ADD Dell_iDRAC_fan_controller.py /Dell_iDRAC_fan_controller.py
 
 RUN chmod 0777 /Dell_iDRAC_fan_controller.py
 
-CMD ["/Dell_iDRAC_fan_controller.py"]
+CMD ["python3", "-u", "/Dell_iDRAC_fan_controller.py"]
