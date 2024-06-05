@@ -32,7 +32,6 @@ third_party_pcie_cooling=load_env_default('THIRD_PARTY_PCIE_COOLING', 'True')
 
 #Get parameters for CPU/TEMP Curves
 CPU_Curve=os.getenv("CPU_Curve","pow(10,((temp-10)/20))")
-print(CPU_Curve)
 GPU_Curve=os.getenv("GPU_Curve","pow(10,((temp-18)/20))")
 MIN_FAN_SPEED=int(os.getenv("MIN_FAN",10))
 DELL_Control=int(os.getenv("DELL_Control",70))
