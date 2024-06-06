@@ -191,7 +191,7 @@ while True:
         temp_dict = get_sensor_data(hostname, SNMP_COMMUNITY, SNMP_Sensors)
         if 'FAN1' in temp_dict:
             avg_fan_speed =[temp_dict[i] for i in temp_dict if 'FAN' in i]
-            avg_fan_speed = sum(avg_fan_speed)/len(avg_fan_speed)
+            avg_fan_speed = int(sum(avg_fan_speed)/len(avg_fan_speed))
     else:
         temp_dict = get_temp_idrac()
         avg_fan_speed = 'NaN'
