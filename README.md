@@ -103,6 +103,9 @@ All parameters are optional as they have default values (including default iDRAC
 - `GPU_Curve` string representation of curve in python, temp is replace with GPU sensor value **Default** "pow(10,((temp-18)/20))", as abvove for CPU_Curve.
 - `DELL_Control` parameter with percentage to hand over control to the dell alogrithumn, **Default** 75C
 - `HYSTERISIS_LENGTH` parameter of number of loops to keep a hysteriss, so that we keep the system cool for an extended period. **Default** 20 loops
+- `USE_SMTP` parameter to use SMTP instead of IDRAC to read temperatures, this is faster and will result in faster loops **Default** False
+- `SMTP_COMMUNITY` parameter to define the SMTP community, **Default** public
+- `STEP_PERCENT` parameter for defining the step increase before applying, the larger the value the more the temperatures need to increase before applying a change. This should result in faster loops. **Default** 2
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

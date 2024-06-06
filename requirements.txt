@@ -1,0 +1,2 @@
+pysnmp-lextudio==5.0.31
+Requests==2.32.3

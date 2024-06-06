@@ -7,6 +7,8 @@ import sys
 import time
 from datetime import datetime
 from collections import deque
+from pysnmp.hlapi import *
+
 
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
@@ -29,8 +31,12 @@ hostname=load_env_default('IDRAC_HOST', 'localhost')
 gpu_host=load_env_default('GPU_HOST', hostname)
 gpu_port=load_env_default('GPU_PORT', '980')
 hysterisis_length=int(load_env_default('HYSTERISIS_LENGTH', '10'))
+STEP_PERCENT=int(load_env_default('STEP_PERCENT', '2'))
 check_interval=int(load_env_default('CHECK_INTERVAL', 5))
 third_party_pcie_cooling=load_env_default('THIRD_PARTY_PCIE_COOLING', 'True')
+
+USE_SNMP=load_env_default('USE_SNMP', 'False')
+SNMP_COMMUNITY=load_env_default('SNMP_COMMUNITY', 'public')
 
 #Get parameters for CPU/TEMP Curves
 CPU_Curve=os.getenv("CPU_Curve","pow(10,((temp-10)/20))")
@@ -74,7 +80,6 @@ def get_temp_idrac():
     return temp_dict
 
 
-
 def third_party_PCIe_card_Dell_default_cooling_response(enable=True):
     # We could check the current cooling response before applying but it's not very useful so let's skip the test and apply directly
     if enable:
@@ -84,13 +89,10 @@ def third_party_PCIe_card_Dell_default_cooling_response(enable=True):
     os.popen(' '.join(['ipmitool', '-I', IDRAC_LOGIN_STRING, 'raw', '0x30', '0xce', '0x00', '0x16', '0x05', '0x00', '0x00', '0x00', '0x05', '0x00', enable_string, '0x00', '0x00']))
 
 
-import subprocess
-
 def apply_Dell_fan_control_profile():
     # Use ipmitool to send the raw command to set fan control to Dell default
     print("Swtich to DELL fan control profile...")
     os.popen(' '.join(['ipmitool', '-I', IDRAC_LOGIN_STRING, 'raw', '0x30', '0x30', '0x01', '0x01']))
-
 
 def apply_user_fan_control_profile(decimal_fan_speed):
     # Use ipmitool to send the raw command to set fan control to user-specified value
@@ -115,9 +117,65 @@ def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp):
     FanCPU1 = int(eval(CPU_Curve.replace('temp','CPU1_temp')))
     FanGPU =  int(eval(GPU_Curve.replace('temp','GPU_temp')))
     current_fanspeed = max(FanCPU0, FanCPU1, FanGPU, MIN_FAN_SPEED)
-    fan_his.append(current_fanspeed)
-    apply_user_fan_control_profile(max(fan_his))
-    return f"User fan control set to {max(fan_his)}", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
+    # Apply only if different by more than STEP_PERCENT since previous apply
+
+    if abs(fan_his[-1]-current_fanspeed)>STEP_PERCENT:
+        fan_his.append(current_fanspeed)
+        apply_user_fan_control_profile(max(fan_his))
+        return f"User fan control set to {max(fan_his)}", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
+    else:
+        fan_his.append(fan_his[-1])
+        return f"User fan control unchanged ({max(fan_his)})", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
+    
+
+SNMP_Sensors = {
+    '1.3.6.1.4.1.674.10892.5.4.700.20.1.6.1.1':{'name':'Inlet', 'divisor':10, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.20.1.6.1.2':{'name':'Exhaust', 'divisor':10, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.20.1.6.1.3':{'name':'CPU0', 'divisor':10, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.20.1.6.1.4':{'name':'CPU1', 'divisor':10, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.12.1.6.1.1':{'name':'FAN1', 'divisor':1, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.12.1.6.1.2':{'name':'FAN2', 'divisor':1, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.12.1.6.1.3':{'name':'FAN3', 'divisor':1, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.12.1.6.1.4':{'name':'FAN4', 'divisor':1, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.12.1.6.1.5':{'name':'FAN5', 'divisor':1, 'int':True},
+    '1.3.6.1.4.1.674.10892.5.4.700.12.1.6.1.6':{'name':'FAN6', 'divisor':1, 'int':True},
+}
+
+
+def get_snmp_data(oid, ip, community):
+    iterator = getCmd(
+        SnmpEngine(),
+        CommunityData(community),
+        UdpTransportTarget((ip, 161)),
+        ContextData(),
+        ObjectType(ObjectIdentity(oid))
+    )
+
+    errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
+
+    if errorIndication:
+        print(f'Error: {errorIndication}')
+        return None
+    elif errorStatus:
+        print(f'Error: {errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex) - 1][0] or "?"}')
+        return None
+    else:
+        for varBind in varBinds:
+            return varBind[1].prettyPrint()
+
+def get_sensor_data(host, community, sensors):
+    return_data = {}
+    for oid in sensors:
+        value = get_snmp_data(oid, host, community)
+        if value and sensors[oid]['divisor'] is not None  and sensors[oid]['int'] is True:
+            return_data[sensors[oid]["name"]]=float(value)/sensors[oid]['divisor']
+        elif value and sensors[oid]['divisor'] is not None:
+            return_data[sensors[oid]["name"]]=float(value)/sensors[oid]['divisor']
+        elif value:
+            return_data[sensors[oid]["name"]]=value
+        else:
+            print('Failed to retrieve SNMP data.')
+    return return_data
 
 i=-1
 cur_time = datetime.now()
@@ -126,7 +184,14 @@ third_party_PCIe_card_Dell_default_cooling_response(third_party_pcie_cooling == 
 print('Initialized, press Ctrl+C to exit')
 while True:
     i+=1
-    temp_dict = get_temp_idrac()
+    if USE_SNMP == "True":
+        temp_dict = get_sensor_data(hostname, SNMP_COMMUNITY, SNMP_Sensors)
+        if 'FAN1' in temp_dict:
+            avg_fan_speed =[temp_dict[i] for i in temp_dict if 'FAN' in i]
+            avg_fan_speed = sum(avg_fan_speed)/len(avg_fan_speed)
+    else:
+        temp_dict = get_temp_idrac()
+        avg_fan_speed = 'NaN'
     gpu_temp = get_temp_gpu(gpu_host, gpu_port)
     prev_time = cur_time
     cur_time = datetime.now()
@@ -136,6 +201,7 @@ while True:
         print_headers()
         i=0
     fan_info,deep_info = set_target_fan_speed(temp_dict['CPU0'], temp_dict['CPU1'], gpu_temp)
+    deep_info = deep_info + ',FA:'+str(avg_fan_speed)
     print(f"{elapsed_time:18}s  {temp_dict['Inlet']:3}°C  {temp_dict['CPU0']:3}°C  {temp_dict['CPU1']:3}°C   {gpu_temp:3}°C  {temp_dict['Exhaust']:3}°C    {fan_info:38}  {third_party_pcie_cooling:21}  {deep_info}")
 
     time.sleep(check_interval)
