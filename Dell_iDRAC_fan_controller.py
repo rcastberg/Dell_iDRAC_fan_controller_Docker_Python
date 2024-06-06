@@ -47,16 +47,19 @@ IDRAC_LOGIN_STRING = f"lanplus -H {hostname} -U {load_env_default('IDRAC_USERNAM
 
 fan_his = deque([10]*10, maxlen=10)
 
-def get_temp_gpu(hostname, port):
-    url = f"http://{gpu_host}:{gpu_port}/"
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
-            return int(response.text.strip())
-        else:
-            return 999
-    except Exception as e:
-        return 999
+def get_temp_gpu(gpu_hostname, port):
+    if gpu_hostname == "False":
+        return 0
+    else:
+      url = f"http://{gpu_hostname}:{gpu_port}/"
+      try:
+          response = requests.get(url)
+          if response.status_code == 200:
+              return int(response.text.strip())
+          else:
+              return 999
+      except Exception as e:
+          return 999
 
 #Use ipmitool to get the temperature of the iDRAC
 #Get the Inlet, Exhaust, and CPU temperatures
@@ -126,7 +129,7 @@ def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp):
     else:
         fan_his.append(fan_his[-1])
         return f"User fan control unchanged ({max(fan_his)})", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
-    
+
 
 SNMP_Sensors = {
     '1.3.6.1.4.1.674.10892.5.4.700.20.1.6.1.1':{'name':'Inlet', 'divisor':10, 'int':True},

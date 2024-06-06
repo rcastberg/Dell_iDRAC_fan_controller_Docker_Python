@@ -94,7 +94,7 @@ All parameters are optional as they have default values (including default iDRAC
 - `IDRAC_HOST` iDRAC's IP address. **Default** value is "localhost".
 - `IDRAC_USERNAME` parameter is only necessary if you're adressing a distant iDRAC. **Default** value is "root".
 - `IDRAC_PASSWORD` parameter is only necessary if you're adressing a distant iDRAC. **Default** value is "password".
-- `GPU_HOST` parameter specifiying the default GPU host, **Default** value is the same as IDRAC_HOST
+- `GPU_HOST` parameter specifiying the default GPU host, set to False if no GPU should be checked **Default** value is the same as IDRAC_HOST
 - `GPU_PORT` parameter specifying the dfeualt GPU port **Default** value is 980
 - `CHECK_INTERVAL` parameter specifying the default check interval **Default** value is 5s, i am unable to get much lower than this.
 - `THIRD_PARTY_PCIE_COOLING` parameter is a boolean that allows to disable third-party PCIe card Dell default cooling response. Default value is false.
