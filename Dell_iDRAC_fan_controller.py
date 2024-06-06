@@ -171,7 +171,7 @@ def get_sensor_data(host, community, sensors):
     for oid in sensors:
         value = get_snmp_data(oid, host, community)
         if value and sensors[oid]['divisor'] is not None  and sensors[oid]['int'] is True:
-            return_data[sensors[oid]["name"]]=float(value)/sensors[oid]['divisor']
+            return_data[sensors[oid]["name"]]=int(float(value)/sensors[oid]['divisor'])
         elif value and sensors[oid]['divisor'] is not None:
             return_data[sensors[oid]["name"]]=float(value)/sensors[oid]['divisor']
         elif value:
