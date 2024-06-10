@@ -112,7 +112,7 @@ def print_headers():
     print("    Elapsed time      Inlet  CPU 1  CPU 2  GPU  Exhaust          Active fan speed profile          3rd PCIe card Dell default   Comment")
     print("                                                                                                       cooling response")
 
-def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp, force=False:
+def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp, force=False):
     if CPU0_temp > DELL_Control or CPU1_temp > DELL_Control:
         apply_Dell_fan_control_profile()
         return "Dell Fan Control"
@@ -130,9 +130,9 @@ def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp, force=False:
         fan_his.append(fan_his[-1])
         if force:
             apply_user_fan_control_profile(max(fan_his))
-            return f"User fan control unchanged ({max(fan_his)})", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
-        else:
             return f"User fan control forced ({max(fan_his)})", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
+        else:
+            return f"User fan control unchanged ({max(fan_his)})", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
 
 
 SNMP_Sensors = {
