@@ -112,7 +112,7 @@ def print_headers():
     print("    Elapsed time      Inlet  CPU 1  CPU 2  GPU  Exhaust          Active fan speed profile          3rd PCIe card Dell default   Comment")
     print("                                                                                                       cooling response")
 
-def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp):
+def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp, force=False:
     if CPU0_temp > DELL_Control or CPU1_temp > DELL_Control:
         apply_Dell_fan_control_profile()
         return "Dell Fan Control"
@@ -128,7 +128,11 @@ def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp):
         return f"User fan control set to {max(fan_his)}", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
     else:
         fan_his.append(fan_his[-1])
-        return f"User fan control unchanged ({max(fan_his)})", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
+        if force:
+            apply_user_fan_control_profile(max(fan_his))
+            return f"User fan control unchanged ({max(fan_his)})", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
+        else:
+            return f"User fan control forced ({max(fan_his)})", f"C0:{FanCPU0},C1:{FanCPU1},G0:{FanGPU},HA:{sum(fan_his)/hysterisis_length:.0f},HM:{max(fan_his)}"
 
 
 SNMP_Sensors = {
@@ -203,7 +207,9 @@ while True:
     if i % 10 == 0:
         print_headers()
         i=0
-    fan_info,deep_info = set_target_fan_speed(temp_dict['CPU0'], temp_dict['CPU1'], gpu_temp)
+        fan_info,deep_info = set_target_fan_speed(temp_dict['CPU0'], temp_dict['CPU1'], gpu_temp, force=True)
+    else:
+        fan_info,deep_info = set_target_fan_speed(temp_dict['CPU0'], temp_dict['CPU1'], gpu_temp)
     deep_info = deep_info + ',FA:'+str(avg_fan_speed)
     print(f"{elapsed_time:18}s  {temp_dict['Inlet']:3}°C  {temp_dict['CPU0']:3}°C  {temp_dict['CPU1']:3}°C   {gpu_temp:3}°C  {temp_dict['Exhaust']:3}°C    {fan_info:38}  {third_party_pcie_cooling:21}  {deep_info}")
 
