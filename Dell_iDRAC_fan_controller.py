@@ -8,10 +8,18 @@ import time
 from datetime import datetime
 from collections import deque
 from pysnmp.hlapi import *
+import logging
+from logging import getLogger, ERROR, CRITICAL, WARNING, INFO, DEBUG
+
+# Enable default logging
+logging.basicConfig(level = logging.INFO)
+logger = logging.getLogger(__name__)
+logger.setLevel("ERROR")
+
 
 
 def signal_handler(sig, frame):
-    print('You pressed Ctrl+C!')
+    logger.error('You pressed Ctrl+C!')
     # Reset fan control to Dell default
     apply_Dell_fan_control_profile()
     sys.exit(0)
@@ -24,8 +32,13 @@ def load_env_default(env_var, default):
         variable = os.environ[env_var]
     except KeyError:
         variable = default
-        print(f"Environment variable {env_var} not set, using default value: {default}")
+        logger.warn(f"Environment variable {env_var} not set, using default value: {default}")
     return variable
+
+debug_level = load_env_default('DEBUG_LEVEL', 'ERROR')
+logger.error(f"Setting log level to {debug_level}")
+logger.setLevel(debug_level)
+logger.info("Starting Dell iDRAC fan controller")
 
 hostname=load_env_default('IDRAC_HOST', 'localhost')
 gpu_host=load_env_default('GPU_HOST', hostname)
@@ -94,7 +107,7 @@ def third_party_PCIe_card_Dell_default_cooling_response(enable=True):
 
 def apply_Dell_fan_control_profile():
     # Use ipmitool to send the raw command to set fan control to Dell default
-    print("Swtich to DELL fan control profile...")
+    logger.info("Swtich to DELL fan control profile...")
     os.popen(' '.join(['ipmitool', '-I', IDRAC_LOGIN_STRING, 'raw', '0x30', '0x30', '0x01', '0x01']))
 
 def apply_user_fan_control_profile(decimal_fan_speed):
@@ -107,10 +120,10 @@ def apply_user_fan_control_profile(decimal_fan_speed):
 
 def print_headers():
     #Loop to check the temperature of the iDRAC with delay set by check_interval
-    print("")
-    print(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S'):19}    ------- Temperatures ------------")
-    print("    Elapsed time      Inlet  CPU 1  CPU 2  GPU  Exhaust          Active fan speed profile          3rd PCIe card Dell default   Comment")
-    print("                                                                                                       cooling response")
+    logger.info("")
+    logger.info(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S'):19}    ------- Temperatures ------------")
+    logger.info("    Elapsed time      Inlet  CPU 1  CPU 2  GPU  Exhaust          Active fan speed profile          3rd PCIe card Dell default   Comment")
+    logger.info("                                                                                                       cooling response")
 
 def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp, force=False):
     if CPU0_temp > DELL_Control or CPU1_temp > DELL_Control:
@@ -161,10 +174,10 @@ def get_snmp_data(oid, ip, community):
     errorIndication, errorStatus, errorIndex, varBinds = next(iterator)
 
     if errorIndication:
-        print(f'Error: {errorIndication}')
+        logger.error(f'Error: {errorIndication}')
         return None
     elif errorStatus:
-        print(f'Error: {errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex) - 1][0] or "?"}')
+        logger.error(f'Error: {errorStatus.prettyPrint()} at {errorIndex and varBinds[int(errorIndex) - 1][0] or "?"}')
         return None
     else:
         for varBind in varBinds:
@@ -181,14 +194,14 @@ def get_sensor_data(host, community, sensors):
         elif value:
             return_data[sensors[oid]["name"]]=value
         else:
-            print('Failed to retrieve SNMP data.')
+            logger.error('Failed to retrieve SNMP data.')
     return return_data
 
 i=-1
 cur_time = datetime.now()
 # Set third party PCIe card cooling to user choice
 third_party_PCIe_card_Dell_default_cooling_response(third_party_pcie_cooling == 'True')
-print('Initialized, press Ctrl+C to exit')
+logger.info('Initialized, press Ctrl+C to exit')
 while True:
     i+=1
     if USE_SNMP == "True":
@@ -211,6 +224,6 @@ while True:
     else:
         fan_info,deep_info = set_target_fan_speed(temp_dict['CPU0'], temp_dict['CPU1'], gpu_temp)
     deep_info = deep_info + ',FA:'+str(avg_fan_speed)
-    print(f"{elapsed_time:18}s  {temp_dict['Inlet']:3}°C  {temp_dict['CPU0']:3}°C  {temp_dict['CPU1']:3}°C   {gpu_temp:3}°C  {temp_dict['Exhaust']:3}°C    {fan_info:38}  {third_party_pcie_cooling:21}  {deep_info}")
+    logger.info(f"{elapsed_time:18}s  {temp_dict['Inlet']:3}°C  {temp_dict['CPU0']:3}°C  {temp_dict['CPU1']:3}°C   {gpu_temp:3}°C  {temp_dict['Exhaust']:3}°C    {fan_info:38}  {third_party_pcie_cooling:21}  {deep_info}")
 
     time.sleep(check_interval)
