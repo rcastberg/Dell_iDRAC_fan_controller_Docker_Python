@@ -14,7 +14,7 @@ from logging import getLogger, ERROR, CRITICAL, WARNING, INFO, DEBUG
 # Enable default logging
 logging.basicConfig(level = logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel("ERROR")
+logger.setLevel("INFO")
 
 
 
@@ -36,7 +36,6 @@ def load_env_default(env_var, default):
         logger.warning(warn_message)
     return variable
 
-logger.setLevel('warning')
 debug_level = load_env_default('DEBUG_LEVEL', 'ERROR')
 logger.error(f"Setting log level to {debug_level}")
 logger.setLevel(debug_level)
