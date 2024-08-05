@@ -32,13 +32,13 @@ def load_env_default(env_var, default):
         variable = os.environ[env_var]
     except KeyError:
         variable = default
-        logger.warn(f"Environment variable {env_var} not set, using default value: {default}")
+        warn_message =f"Environment variable {env_var} not set, using default value: {default}"
+        logger.warning(warn_message)
     return variable
 
 debug_level = load_env_default('DEBUG_LEVEL', 'ERROR')
 logger.error(f"Setting log level to {debug_level}")
 logger.setLevel(debug_level)
-logger.info("Starting Dell iDRAC fan controller")
 
 hostname=load_env_default('IDRAC_HOST', 'localhost')
 gpu_host=load_env_default('GPU_HOST', hostname)
