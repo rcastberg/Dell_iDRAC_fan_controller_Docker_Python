@@ -12,11 +12,9 @@ import logging
 from logging import getLogger, ERROR, CRITICAL, WARNING, INFO, DEBUG
 
 # Enable default logging
-logging.basicConfig(level = logging.INFO)
+logging.basicConfig(level = logging.INFO, format='%(message)s')
 logger = logging.getLogger(__name__)
 logger.setLevel("INFO")
-
-
 
 def signal_handler(sig, frame):
     logger.error('You pressed Ctrl+C!')
