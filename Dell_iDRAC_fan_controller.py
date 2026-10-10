@@ -84,14 +84,29 @@ def get_temp_idrac():
     temp_dict = {}
     for temp in temp_data:
         if "Inlet" in temp:
-            temp_dict['Inlet'] = int(temp.split('|')[4].split()[0])
+            value = parse_ipmi_temp(temp)
+            if value is not None:
+                temp_dict['Inlet'] = value
         elif "Exhaust" in temp:
-            temp_dict['Exhaust'] = int(temp.split('|')[4].split()[0])
+            value = parse_ipmi_temp(temp)
+            if value is not None:
+                temp_dict['Exhaust'] = value
     # The CPU temperatures are stored using the same key in temp_data called Temp, store each as a new cpu key in temp_dict
     cpu_temps = [temp for temp in temp_data if temp.startswith('Temp')]
     for i, temp in enumerate(cpu_temps):
-        temp_dict[f'CPU{i}'] = int(temp.split('|')[4].split()[0])
+        value = parse_ipmi_temp(temp)
+        if value is not None:
+            temp_dict[f'CPU{i}'] = value
     return temp_dict
+
+
+# Sensors read "No Reading" (or are missing) while the server POSTs or the iDRAC resets
+def parse_ipmi_temp(line):
+    try:
+        return int(line.split('|')[4].split()[0])
+    except (IndexError, ValueError):
+        logger.debug(f"Unparsable temperature line: {line}")
+        return None
 
 
 def third_party_PCIe_card_Dell_default_cooling_response(enable=True):
@@ -126,7 +141,7 @@ def print_headers():
 def set_target_fan_speed(CPU0_temp, CPU1_temp, GPU_temp, force=False):
     if CPU0_temp > DELL_Control or CPU1_temp > DELL_Control:
         apply_Dell_fan_control_profile()
-        return "Dell Fan Control"
+        return "Dell Fan Control", f"C0:{CPU0_temp},C1:{CPU1_temp}>{DELL_Control}"
     FanCPU0 = int(eval(CPU_Curve.replace('temp','CPU0_temp')))
     FanCPU1 = int(eval(CPU_Curve.replace('temp','CPU1_temp')))
     FanGPU =  int(eval(GPU_Curve.replace('temp','GPU_temp')))
@@ -210,6 +225,14 @@ while True:
     else:
         temp_dict = get_temp_idrac()
         avg_fan_speed = 'NaN'
+    missing = [key for key in ('Inlet', 'Exhaust', 'CPU0', 'CPU1') if key not in temp_dict]
+    if missing:
+        # No valid readings: hand the fans back to the iDRAC until the sensors return
+        logger.warning(f"No temperature reading for {', '.join(missing)}, switching to Dell fan control")
+        apply_Dell_fan_control_profile()
+        i = 9  # next valid reading takes the "force" path and re-applies the user profile
+        time.sleep(check_interval)
+        continue
     gpu_temp = get_temp_gpu(gpu_host, gpu_port)
     prev_time = cur_time
     cur_time = datetime.now()
